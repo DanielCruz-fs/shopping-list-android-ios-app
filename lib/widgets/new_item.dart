@@ -1,6 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shopping_list/data/categories.dart';
 import 'package:shopping_list/models/category.dart';
+
+// Using http package to make HTTP requests
+// we use 'as' to give the package a different name, so we can use it without conflicts
+// 'http' is like an alias for the package, and also an object that we can use to access the package's functionality
+import 'package:http/http.dart' as http;
 import 'package:shopping_list/models/grocery_item.dart';
 
 class NewItem extends StatefulWidget {
@@ -21,18 +28,47 @@ class _NewItemState extends State<NewItem> {
   var _enteredName = '';
   var _enteredQuantity = 1;
   var _selectedCategory = categories[Categories.vegetables]!;
+  var _isSending = false;
 
-  void _saveItem() {
+  void _saveItem() async {
     // calling the validate method triggers the validation of all form fields
     if (_formKey.currentState!.validate()) {
       // calling the save method triggers the onSaved callback of all form fields
       // There is no need to call setState() here because the form state is separate from the widget state
       _formKey.currentState!.save();
+
+      setState(() {
+        _isSending = true;
+      });
+
+      final url = Uri.https(
+          'flutter-first-db-5856e-default-rtdb.firebaseio.com',
+          'shopping-list.json');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(
+          {
+            'name': _enteredName,
+            'quantity': _enteredQuantity,
+            'category': _selectedCategory.title,
+          },
+        ),
+      );
+
+      final Map<String, dynamic> responseData = json.decode(response.body);
+
+      if (!context.mounted) {
+        return;
+      }
+
       // Pop works like a back button, it removes the current route from the stack
       // we send back the new item to the previous screen
       Navigator.of(context).pop(
         GroceryItem(
-          id: DateTime.now().toString(),
+          id: responseData['name'],
           name: _enteredName,
           quantity: _enteredQuantity,
           category: _selectedCategory,
@@ -127,14 +163,22 @@ class _NewItemState extends State<NewItem> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => {
-                      _formKey.currentState!.reset(),
-                    },
+                    onPressed: _isSending
+                        ? null
+                        : () => {
+                              _formKey.currentState!.reset(),
+                            },
                     child: const Text('Reset'),
                   ),
                   ElevatedButton(
-                    onPressed: _saveItem,
-                    child: const Text('Add Item'),
+                    onPressed: _isSending ? null : _saveItem,
+                    child: _isSending
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(),
+                          )
+                        : const Text('Add Item'),
                   ),
                 ],
               ),
