@@ -34,6 +34,7 @@ class _GroceryListState extends State<GroceryList> {
           _error = 'Failed to load items';
           _isLoading = false;
         });
+        return;
       }
 
       if (response.body == 'null') {
